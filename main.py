@@ -153,6 +153,11 @@ if __name__ == "__main__":
 	optimizer_G = torch.optim.Adam(generator.parameters(), lr=lr, betas=(b1, b2))
 	optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(b1, b2))
 
+	generator.load_state_dict(torch.load("generator"))
+	generator.eval()
+	discriminator.load_state_dict(torch.load("discriminator"))
+	discriminator.eval()
+
 	Tensor = torch.FloatTensor
 
 	train_batch = torch.zeros([gan_batch_size, 9], dtype=torch.float64)
@@ -256,6 +261,7 @@ if __name__ == "__main__":
 			np.concatenate((state, action, next_state, np.array([reward]), np.array([done_bool])), 0))
 		generative_replay_index = generative_replay_index + 1
 
+
 		# Store data in replay buffer
 		replay_buffer.add(state, action, next_state, reward, done_bool)
 		#print([state, action, next_state, reward, done_bool])
@@ -264,8 +270,10 @@ if __name__ == "__main__":
 		episode_reward += reward
 
 		# Train agent after collecting sufficient data
-		if t >= args.start_timesteps:
+		if t >= args.start_timesteps and t>10000:
 			policy.train(generator, args.batch_size)
+		if t >= args.start_timesteps and t<=10000:
+			policy.train(replay_buffer, args.batch_size)
 
 		if done:
 			# +1 to account for 0 indexing. +0 on ep_timesteps since it will increment +1 even if done=True
