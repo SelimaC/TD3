@@ -65,9 +65,25 @@ class VAE(nn.Module):
 			torch.FloatTensor(result[:, -1]).unsqueeze(1).to(self.device)
 		)
 
+	def sampleMemory(self, batch_size):
+
+		sample = Variable(torch.randn(batch_size, self.z_dim))
+		recon_x = self.decoder(sample).detach().numpy()
+		result = self.descale(torch.Tensor(recon_x))
+
+		## descale
+
+		return (
+			torch.FloatTensor(result[:, 0:3]).to(self.device),
+			torch.FloatTensor(result[:, 3]).unsqueeze(1).to(self.device),
+			torch.FloatTensor(result[:, 4:7]).to(self.device),
+			torch.FloatTensor(result[:, -2]).unsqueeze(1).to(self.device),
+			torch.FloatTensor(np.random.choice(2,batch_size, p=[1/200.0, 199/200.0])).unsqueeze(1).to(self.device)
+		)
+
 
 class Generator(nn.Module):
-	def __init__(self, action_shape, state_shape, action_low, action_high, state_low, state_high, latent_dim=3):
+	def __init__(self, action_shape, state_shape, action_low, action_high, state_low, state_high, latent_dim=2):
 		super(Generator, self).__init__()
 
 		self.action_shape = action_shape
@@ -98,13 +114,33 @@ class Generator(nn.Module):
 		)
 
 	def forward(self, z):
+		#print(z.shape)
 		x = self.model(z)
+		#print(x.shape)
 		x = x.view(x.size(0), *self.input_shape)
+		#print(x.shape)
 		return x
+
+	def sample(self, batch_size):
+		# Sample noise as generator input
+		z = Variable(torch.FloatTensor(np.random.normal(0, 1, (batch_size, self.latent_dim))))
+		#print(z.shape)
+		# Generate a batch of images
+		gen_experiences = self.model(z).detach().numpy()
+		result = descale(torch.Tensor(gen_experiences), self.state_low, self.state_high,
+		                 self.action_low, self.action_high, self.reward_low, self.reward_high)
+
+		return (
+			torch.FloatTensor(result[:, 0:3]).to(self.device),
+			torch.FloatTensor(result[:, 3]).unsqueeze(1).to(self.device),
+			torch.FloatTensor(result[:, 4:7]).to(self.device),
+			torch.FloatTensor(result[:, -2]).unsqueeze(1).to(self.device),
+			torch.FloatTensor(np.random.choice(2, batch_size, p=[1 / 200.0, 199 / 200.0])).unsqueeze(1).to(self.device)
+		)
 
 
 class Discriminator(nn.Module):
-	def __init__(self, action_shape, state_shape, action_low, action_high, state_low, state_high, latent_dim=3):
+	def __init__(self, action_shape, state_shape, action_low, action_high, state_low, state_high, latent_dim=2):
 		super(Discriminator, self).__init__()
 
 		self.action_shape = action_shape

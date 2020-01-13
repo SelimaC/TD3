@@ -26,7 +26,8 @@ def descale(x, state_low, state_high, action_low, action_high, reward_low, rewar
 	(((x[:, 5].sub_(a)).div_(b-a)).mul_(state_high[1] - state_low[1])).add_(state_low[1])
 	(((x[:, 6].sub_(a)).div_(b-a)).mul_(state_high[2] - state_low[2])).add_(state_low[2])
 	(((x[:, 7].sub_(a)).div_(b-a)).mul_(reward_high - reward_low)).add_(reward_low)
-	((x[:, 8].sub_(a)).div_(b-a)).round_()
+	#((x[:, 8].sub_(a)).div_(b-a)).round_()
+
 
 	return x
 

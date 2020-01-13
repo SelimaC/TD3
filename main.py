@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
 	replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
 
-	vae_batch_size = 100
+	gan_batch_size = 100
 	gen_batch_size = 300
 	n_epochs=10
 	state_dim = env.observation_space.shape[0]
@@ -137,10 +137,25 @@ if __name__ == "__main__":
 	state_low = env.observation_space.low
 	state_high = env.observation_space.high
 	max_action = float(action_high)
-	generative_memory = generative_memory.VAE(action_dim, state_dim, action_low, action_high, state_low, state_high)
 
-	optimizer = torch.optim.Adam(generative_memory.parameters(), lr=1e-3)
-	train_batch = torch.zeros([vae_batch_size, 9], dtype=torch.float64)
+	# Loss function
+	adversarial_loss = torch.nn.BCELoss()
+	n_epochs = 20
+	batch_size = 512
+	lr = 0.001
+	b1 = 0.5
+	b2 = 0.999
+	n_cpu = 8
+	latent_dim = 2
+	# Initialize generator and discriminator
+	generator = generative_memory.Generator(action_dim, state_dim, action_low, action_high, state_low, state_high)
+	discriminator = generative_memory.Discriminator(action_dim, state_dim, action_low, action_high, state_low, state_high)
+	optimizer_G = torch.optim.Adam(generator.parameters(), lr=lr, betas=(b1, b2))
+	optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(b1, b2))
+
+	Tensor = torch.FloatTensor
+
+	train_batch = torch.zeros([gan_batch_size, 9], dtype=torch.float64)
 	generative_replay_index = 0
 
 	# Evaluate untrained policy
@@ -152,7 +167,8 @@ if __name__ == "__main__":
 	episode_timesteps = 0
 	episode_num = 0
 	epochs_count=0
-	loss = 0
+	d_loss = 0
+	g_loss = 0
 
 	for t in range(int(args.max_timesteps)):
 
@@ -171,33 +187,68 @@ if __name__ == "__main__":
 		next_state, reward, done, _ = env.step(action)
 		done_bool = float(done) if episode_timesteps < env._max_episode_steps else 0
 
-		if generative_replay_index >= vae_batch_size:
+		if generative_replay_index >= gan_batch_size:
+			generative_replay_index = 0
 			generative_replay_index = 0
 			if t >= args.start_timesteps:
-				batch = torch.cat((train_batch.float() , torch.cat(generative_memory.sample(512),1).float()),0)
+				batch = torch.cat(
+					(train_batch.float(), torch.cat(generator.sample(gen_batch_size), 1).float()), 0)
 			else:
-				batch=train_batch
-			batch = scale(batch,generative_memory.state_low, generative_memory.state_high,
-			              generative_memory.action_low, generative_memory.action_high,
-			              generative_memory.reward_low, generative_memory.reward_high)
+				batch = train_batch
+			batch = scale(batch,generator.state_low, generator.state_high,
+			              generator.action_low, generator.action_high,
+			              generator.reward_low, generator.reward_high)
 
 			train_iterator = DataLoader(batch, batch_size=28, shuffle=True)
-			print("Training vae [{}]".format(epochs_count))
+			print("Training GAN [{}]".format(epochs_count))
 
 			for epoch in range(n_epochs):
-				for idx, experiences in enumerate(train_iterator):
+				for i, experiences in enumerate(train_iterator):
+					# Adversarial ground truths
+					valid = Variable(Tensor(experiences.size(0), 1).fill_(1.0), requires_grad=False)
+					fake = Variable(Tensor(experiences.size(0), 1).fill_(0.0), requires_grad=False)
 
-					experiences = flatten(experiences.float())
-					recon_experiences, mu, logvar = generative_memory(experiences)
+					# Configure input
+					real_imgs = Variable(experiences).type(Tensor)[:,:-1]
 
-					loss = loss_fn(recon_experiences, experiences, mu, logvar)
+					# -----------------
+					#  Train Generator
+					# -----------------
 
-					optimizer.zero_grad()
-					loss.backward()
-					optimizer.step()
-					loss=loss.data.item()
+					optimizer_G.zero_grad()
 
-			print("Epoch[{}] Loss: {:.3f}".format(epochs_count, loss))
+					# Sample noise as generator input
+					z = Variable(Tensor(np.random.normal(0, 1, (real_imgs.shape[0], latent_dim))))
+
+					# Generate a batch of images
+					gen_experiences = generator(z)
+
+					# Loss measures generator's ability to fool the discriminator
+					g_loss = adversarial_loss(discriminator(gen_experiences), valid)
+
+					g_loss.backward()
+					optimizer_G.step()
+
+					# ---------------------
+					#  Train Discriminator
+					# ---------------------
+
+					optimizer_D.zero_grad()
+
+					# Measure discriminator's ability to classify real from generated samples
+					real_loss = adversarial_loss(discriminator(real_imgs), valid)
+					fake_loss = adversarial_loss(discriminator(gen_experiences.detach()), fake)
+					d_loss = (real_loss + fake_loss) / 2
+
+					d_loss.backward()
+					optimizer_D.step()
+
+					d_loss=d_loss.item()
+					g_loss=g_loss.item()
+
+					batches_done = epoch * len(train_iterator) + i
+
+			print("Epoch[{}] [D loss: {}] [G loss: {}]".format(epochs_count, d_loss, g_loss))
 			epochs_count = epochs_count + 1
 
 
@@ -214,7 +265,7 @@ if __name__ == "__main__":
 
 		# Train agent after collecting sufficient data
 		if t >= args.start_timesteps:
-			policy.train(generative_memory, args.batch_size)
+			policy.train(generator, args.batch_size)
 
 		if done:
 			# +1 to account for 0 indexing. +0 on ep_timesteps since it will increment +1 even if done=True
