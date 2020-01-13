@@ -1,0 +1,1 @@
+# python main.py --policy "TD3" --env "Pendulum-v0" --seed 1 --start_timesteps 1000

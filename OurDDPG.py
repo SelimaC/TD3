@@ -1,5 +1,4 @@
 import copy
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,7 +20,6 @@ class Actor(nn.Module):
 		
 		self.max_action = max_action
 
-	
 	def forward(self, state):
 		a = F.relu(self.l1(state))
 		a = F.relu(self.l2(a))
@@ -35,7 +33,6 @@ class Critic(nn.Module):
 		self.l1 = nn.Linear(state_dim + action_dim, 400)
 		self.l2 = nn.Linear(400, 300)
 		self.l3 = nn.Linear(300, 1)
-
 
 	def forward(self, state, action):
 		q = F.relu(self.l1(torch.cat([state, action], 1)))
@@ -56,11 +53,9 @@ class DDPG(object):
 		self.discount = discount
 		self.tau = tau
 
-
 	def select_action(self, state):
 		state = torch.FloatTensor(state.reshape(1, -1)).to(device)
 		return self.actor(state).cpu().data.numpy().flatten()
-
 
 	def train(self, replay_buffer, batch_size=100):
 		# Sample replay buffer 
@@ -96,13 +91,11 @@ class DDPG(object):
 		for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
 			target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-
 	def save(self, filename):
 		torch.save(self.critic.state_dict(), filename + "_critic")
 		torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")
 		torch.save(self.actor.state_dict(), filename + "_actor")
 		torch.save(self.actor_optimizer.state_dict(), filename + "_actor_optimizer")
-
 
 	def load(self, filename):
 		self.critic.load_state_dict(torch.load(filename + "_critic"))

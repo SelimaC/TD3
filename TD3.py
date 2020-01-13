@@ -20,7 +20,6 @@ class Actor(nn.Module):
 		self.l3 = nn.Linear(256, action_dim)
 		
 		self.max_action = max_action
-		
 
 	def forward(self, state):
 		a = F.relu(self.l1(state))
@@ -42,7 +41,6 @@ class Critic(nn.Module):
 		self.l5 = nn.Linear(256, 256)
 		self.l6 = nn.Linear(256, 1)
 
-
 	def forward(self, state, action):
 		sa = torch.cat([state, action], 1)
 
@@ -54,7 +52,6 @@ class Critic(nn.Module):
 		q2 = F.relu(self.l5(q2))
 		q2 = self.l6(q2)
 		return q1, q2
-
 
 	def Q1(self, state, action):
 		sa = torch.cat([state, action], 1)
@@ -95,17 +92,16 @@ class TD3(object):
 
 		self.total_it = 0
 
-
 	def select_action(self, state):
 		state = torch.FloatTensor(state.reshape(1, -1)).to(device)
 		return self.actor(state).cpu().data.numpy().flatten()
 
-
-	def train(self, replay_buffer, batch_size=100):
+	def train(self, generative_memory, batch_size=100):
 		self.total_it += 1
 
 		# Sample replay buffer 
-		state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
+		state, action, next_state, reward, not_done = generative_memory.sample(batch_size)
+		# sample = generative_memory.sample(batch_size)
 
 		with torch.no_grad():
 			# Select action according to policy and add clipped noise
@@ -151,13 +147,11 @@ class TD3(object):
 			for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
 				target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-
 	def save(self, filename):
 		torch.save(self.critic.state_dict(), filename + "_critic")
 		torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")
 		torch.save(self.actor.state_dict(), filename + "_actor")
 		torch.save(self.actor_optimizer.state_dict(), filename + "_actor_optimizer")
-
 
 	def load(self, filename):
 		self.critic.load_state_dict(torch.load(filename + "_critic"))
