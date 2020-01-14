@@ -5,15 +5,15 @@ import torch
 from torch.utils.data import Dataset
 
 def scale(x, state_low, state_high, action_low, action_high, reward_low, reward_high, a=-1, b=1):
-	(((x[:, 0].sub_(state_low[0])).div_((state_high[0] - state_low[0]))).mul_(b-a)).add_(a)
-	(((x[:, 1].sub_(state_low[1])).div_((state_high[1] - state_low[1]))).mul_(b-a)).add_(a)
+	#(((x[:, 0].sub_(state_low[0])).div_((state_high[0] - state_low[0]))).mul_(b-a)).add_(a)
+	#(((x[:, 1].sub_(state_low[1])).div_((state_high[1] - state_low[1]))).mul_(b-a)).add_(a)
 	(((x[:, 2].sub_(state_low[2])).div_((state_high[2] - state_low[2]))).mul_(b-a)).add_(a)
 	(((x[:, 3].sub_(action_low)).div_((action_high - action_low))).mul_(b-a)).add_(a)
-	(((x[:, 4].sub_(state_low[0])).div_((state_high[0] - state_low[0]))).mul_(b-a)).add_(a)
-	(((x[:, 5].sub_(state_low[1])).div_((state_high[1] - state_low[1]))).mul_(b-a)).add_(a)
+	#(((x[:, 4].sub_(state_low[0])).div_((state_high[0] - state_low[0]))).mul_(b-a)).add_(a)
+	#(((x[:, 5].sub_(state_low[1])).div_((state_high[1] - state_low[1]))).mul_(b-a)).add_(a)
 	(((x[:, 6].sub_(state_low[2])).div_((state_high[2] - state_low[2]))).mul_(b-a)).add_(a)
 	(((x[:, 7].sub_(reward_low)).div_((reward_high - reward_low))).mul_(b-a)).sub_(1.0)
-	(((x[:, 8].sub_(0.0)).div_(1.0)).mul_(b-a)).add_(a)
+	#(((x[:, 8].sub_(0.0)).div_(1.0)).mul_(b-a)).add_(a)
 	return x
 
 
@@ -26,7 +26,7 @@ def descale(x, state_low, state_high, action_low, action_high, reward_low, rewar
 	(((x[:, 5].sub_(a)).div_(b-a)).mul_(state_high[1] - state_low[1])).add_(state_low[1])
 	(((x[:, 6].sub_(a)).div_(b-a)).mul_(state_high[2] - state_low[2])).add_(state_low[2])
 	(((x[:, 7].sub_(a)).div_(b-a)).mul_(reward_high - reward_low)).add_(reward_low)
-	((x[:, 8].sub_(a)).div_(b-a)).round_()
+	#((x[:, 8].sub_(a)).div_(b-a)).round_()
 
 	return x
 

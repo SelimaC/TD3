@@ -128,8 +128,8 @@ if __name__ == "__main__":
 	replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
 
 	vae_batch_size = 100
-	gen_batch_size = 300
-	n_epochs=10
+	gen_batch_size = 500
+	n_epochs = 10
 	state_dim = env.observation_space.shape[0]
 	action_dim = env.action_space.shape[0]
 	action_low = env.action_space.low[0]
@@ -138,6 +138,9 @@ if __name__ == "__main__":
 	state_high = env.observation_space.high
 	max_action = float(action_high)
 	generative_memory = generative_memory.VAE(action_dim, state_dim, action_low, action_high, state_low, state_high)
+
+	generative_memory.load_state_dict(torch.load("model"))
+	generative_memory.eval()
 
 	optimizer = torch.optim.Adam(generative_memory.parameters(), lr=1e-3)
 	train_batch = torch.zeros([vae_batch_size, 9], dtype=torch.float64)
@@ -174,7 +177,7 @@ if __name__ == "__main__":
 		if generative_replay_index >= vae_batch_size:
 			generative_replay_index = 0
 			if t >= args.start_timesteps:
-				batch = torch.cat((train_batch.float() , torch.cat(generative_memory.sample(512),1).float()),0)
+				batch = torch.cat((train_batch.float() , torch.cat(generative_memory.sample(gen_batch_size),1).float()),0)
 			else:
 				batch=train_batch
 			batch = scale(batch,generative_memory.state_low, generative_memory.state_high,
@@ -188,9 +191,9 @@ if __name__ == "__main__":
 				for idx, experiences in enumerate(train_iterator):
 
 					experiences = flatten(experiences.float())
-					recon_experiences, mu, logvar = generative_memory(experiences)
+					recon_experiences, mu, logvar = generative_memory(experiences[:,:-1])
 
-					loss = loss_fn(recon_experiences, experiences, mu, logvar)
+					loss = loss_fn(recon_experiences, experiences[:,:-1], mu, logvar)
 
 					optimizer.zero_grad()
 					loss.backward()
@@ -213,8 +216,10 @@ if __name__ == "__main__":
 		episode_reward += reward
 
 		# Train agent after collecting sufficient data
-		if t >= args.start_timesteps:
+		if t >= args.start_timesteps and t > 10000:
 			policy.train(generative_memory, args.batch_size)
+		if t >= args.start_timesteps and t <= 10000:
+			policy.train(replay_buffer, args.batch_size)
 
 		if done:
 			# +1 to account for 0 indexing. +0 on ep_timesteps since it will increment +1 even if done=True

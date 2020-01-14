@@ -100,7 +100,7 @@ class TD3(object):
 		self.total_it += 1
 
 		# Sample replay buffer 
-		state, action, next_state, reward, not_done = generative_memory.sample(batch_size)
+		state, action, next_state, reward, not_done = generative_memory.sample(256)
 		# sample = generative_memory.sample(batch_size)
 
 		with torch.no_grad():

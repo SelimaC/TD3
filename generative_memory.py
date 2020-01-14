@@ -6,12 +6,12 @@ from utils import scale, descale
 
 
 class VAE(nn.Module):
-	def __init__(self, action_shape, state_shape, action_low, action_high, state_low, state_high, h_dim=7, z_dim=3):
+	def __init__(self, action_shape, state_shape, action_low, action_high, state_low, state_high, h_dim=4, z_dim=2):
 		super(VAE, self).__init__()
 
 		self.action_shape = action_shape
 		self.state_shape = state_shape
-		self.feature_size = self.action_shape + (2 * self.state_shape) + 2
+		self.feature_size = self.action_shape + (2 * self.state_shape) + 1
 		self.action_low = action_low
 		self.action_high = action_high
 		self.state_low = state_low
@@ -49,7 +49,6 @@ class VAE(nn.Module):
 		z = self.decoder(z)
 
 		return z, mu, logvar
-
 	def sample(self, batch_size):
 
 		sample = Variable(torch.randn(batch_size, self.z_dim))
@@ -62,7 +61,7 @@ class VAE(nn.Module):
 			torch.FloatTensor(result[:, 3]).unsqueeze(1).to(self.device),
 			torch.FloatTensor(result[:, 4:7]).to(self.device),
 			torch.FloatTensor(result[:, -2]).unsqueeze(1).to(self.device),
-			torch.FloatTensor(result[:, -1]).unsqueeze(1).to(self.device)
+			torch.FloatTensor(np.random.choice(2,batch_size, p=[1/200.0, 199/200.0])).unsqueeze(1).to(self.device)
 		)
 
 
