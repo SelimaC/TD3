@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch
 from torch.autograd import Variable
 from utils import scale, descale
-
+import torch.nn.functional as F
 
 class VAE(nn.Module):
 	def __init__(self, action_shape, state_shape, action_low, action_high, state_low, state_high, h_dim=7, z_dim=3):
