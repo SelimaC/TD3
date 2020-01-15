@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def angle_normalize(x):
+	return (((x + np.pi) % (2 * np.pi)) - np.pi)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -96,12 +98,29 @@ class TD3(object):
 		state = torch.FloatTensor(state.reshape(1, -1)).to(device)
 		return self.actor(state).cpu().data.numpy().flatten()
 
-	def train(self, generative_memory, batch_size=100):
+	def train(self, generative_memory, batch_size=100, gen=False):
 		self.total_it += 1
 
-		# Sample replay buffer 
-		state, action, next_state, reward, not_done = generative_memory.sample(batch_size)
-		# sample = generative_memory.sample(batch_size)
+		if gen:
+			# Sample replay buffer
+			# state, action, next_state, reward, not_done = replay.sample(batch_size) #generate from genReplay somehow
+			samples = generative_memory.sample(batch_size)  # generate from genReplay somehow
+			state = samples[:, 0:3]
+			action = samples[:, -1]
+			next_state = []
+			reward = []
+			not_done = []
+			for ix in range(batch_size):
+				ns, r, nd = self.get_next(state[ix], action[ix])
+				next_state.append(ns)
+				reward.append(r)
+				not_done.append(nd)
+			next_state = torch.Tensor(next_state)
+			reward = torch.Tensor(reward)
+			not_done = torch.Tensor(not_done)
+			action = action.unsqueeze(1)
+		else:
+			state, action, next_state, reward, not_done = generative_memory.sample(batch_size)
 
 		with torch.no_grad():
 			# Select action according to policy and add clipped noise
@@ -158,3 +177,23 @@ class TD3(object):
 		self.critic_optimizer.load_state_dict(torch.load(filename + "_critic_optimizer"))
 		self.actor.load_state_dict(torch.load(filename + "_actor"))
 		self.actor_optimizer.load_state_dict(torch.load(filename + "_actor_optimizer"))
+
+	def get_next(self, state, action):
+		# print(state.shape)
+		th = state[0]
+		thdot = state[2]
+
+		g = 10.0
+		m = 1.
+		l = 1.
+		dt = 0.05
+
+		action = np.clip(action, -2.0, 2.0).item()
+		costs = angle_normalize(th) ** 2 + .1 * thdot ** 2 + .001 * (action ** 2)
+
+		newthdot = thdot + (-3 * g / (2 * l) * np.sin(th + np.pi) + 3. / (m * l ** 2) * action) * dt
+		newth = th + newthdot * dt
+		newthdot = np.clip(newthdot, -8, 8)  # pylint: disable=E1111
+		new_state = [np.cos(newth), np.sin(newth), newthdot]
+
+		return new_state, [-costs], [0]
